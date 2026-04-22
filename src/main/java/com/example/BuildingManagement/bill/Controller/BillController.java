@@ -84,4 +84,31 @@ public class BillController {
                 "bills", generated
         ));
     }
+
+    /**
+     * Update the unit rate of a specific bill.
+     * This will recalculate the bill total and optionally generate a new payment link.
+     */
+    @PutMapping("/{billId}/unit-rate")
+    @PreAuthorize("hasRole('LANDLORD')")
+    public ResponseEntity<Map<String, Object>> updateBillUnitRate(
+            @PathVariable Long billId,
+            @RequestBody Map<String, java.math.BigDecimal> payload) {
+        
+        java.math.BigDecimal unitRate = payload.get("unitRate");
+        if (unitRate == null || unitRate.compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Valid unitRate is required"));
+        }
+
+        try {
+            Bill updatedBill = billService.updateUnitRate(billId, unitRate);
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "message", "Unit rate updated successfully",
+                    "bill", updatedBill
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
 }

@@ -28,4 +28,7 @@ public class IotDevice {
 
     @Column(name = "unit_rate_per_kwh")
     private BigDecimal unitRatePerKwh;
+
+    @Column(name = "ip_address")
+    private String ipAddress;
 }

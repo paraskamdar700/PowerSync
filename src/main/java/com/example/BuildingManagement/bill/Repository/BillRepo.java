@@ -12,6 +12,8 @@ import java.util.Optional;
 @Repository
 public interface BillRepo extends JpaRepository<Bill, Long> {
 
+    Optional<Bill> findByPaymentOrderId(String paymentOrderId);
+
     List<Bill> findByTenantIdOrderByBillingPeriodEndDesc(Long tenantId);
 
     List<Bill> findByRoomIdOrderByBillingPeriodEndDesc(Long roomId);

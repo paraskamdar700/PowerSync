@@ -10,7 +10,11 @@ import com.example.BuildingManagement.power.Repository.PowerMetricRepo;
 import com.example.BuildingManagement.room.Model.Room;
 import com.example.BuildingManagement.room.Repository.RoomRepo;
 import com.example.BuildingManagement.user.Model.User;
+import com.example.BuildingManagement.payment.CashfreeService;
+import com.example.BuildingManagement.payment.CashfreeOrderResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,6 +35,8 @@ public class BillService {
     private final RoomRepo roomRepo;
     private final IotDeviceRepo iotDeviceRepo;
     private final PowerMetricRepo powerMetricRepo;
+    private final CashfreeService cashfreeService;
+    private final JavaMailSender mailSender;
 
     /**
      * Generate monthly bills for all rooms with active tenants and IoT devices.
@@ -125,19 +131,64 @@ public class BillService {
             bill.setUnitRate(unitRate);
             bill.setTotalAmount(totalAmount);
             bill.setPaymentStatus(PaymentStatus.UNPAID);
+            bill.setDueDate(LocalDateTime.now().plusDays(3)); // 3 day due limit
+
+            // Generate Cashfree Payment Link
+            if (totalAmount.compareTo(BigDecimal.ZERO) > 0) {
+                String billDesc = "Electricity Bill: Room " + room.getRoomNumber() + " for " + billingMonth.getMonth();
+                CashfreeOrderResponse cfResp = cashfreeService.createOrder(
+                        tenant.getFullname(), tenant.getEmail(), tenant.getContactNo(), totalAmount, billDesc);
+                
+                if (cfResp != null) {
+                    bill.setPaymentOrderId(cfResp.getOrderId());
+                    // Cashfree Sandbox Checkout URL. This assumes you will use their pre-built checkout page
+                    String link = "https://checkout-sandbox.cashfree.com/pay/" + cfResp.getPaymentSessionId();
+                    bill.setPaymentLink(link);
+                }
+            }
 
             billRepo.save(bill);
             generatedBills.add(bill);
 
+            // Send Email to Tenant
+            sendBillEmail(bill);
+
             System.out.println("  ✓ Bill generated for Room " + room.getRoomNumber() +
                     " | Tenant: " + tenant.getFullname() +
-                    " | Units: " + unitsConsumed + " kWh" +
-                    " | Rate: ₹" + unitRate + "/kWh" +
                     " | Total: ₹" + totalAmount);
         }
 
         System.out.println("=== Bill generation complete. Total bills: " + generatedBills.size() + " ===");
         return generatedBills;
+    }
+
+    private void sendBillEmail(Bill bill) {
+        if (bill.getTenant().getEmail() == null || bill.getTotalAmount().compareTo(BigDecimal.ZERO) <= 0) return;
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(bill.getTenant().getEmail());
+        message.setSubject("Electricity Bill Generated - PowerSync");
+
+        String text = "Hello " + bill.getTenant().getFullname() + ",\n\n" +
+                "Your electricity bill for Room " + bill.getRoom().getRoomNumber() + " has been generated.\n\n" +
+                "Total Amount: ₹" + bill.getTotalAmount() + "\n" +
+                "Units Consumed: " + bill.getUnitsConsumed() + " kWh\n" +
+                "Due Date: " + bill.getDueDate().toLocalDate() + "\n\n";
+
+        if (bill.getPaymentLink() != null) {
+            text += "Please pay using the link below within 3 days to avoid automatic power cutoff:\n" +
+                    bill.getPaymentLink() + "\n\n";
+        } else {
+            text += "Please log in to your dashboard to pay your bill.\n\n";
+        }
+
+        text += "Thank you,\nPowerSync Management";
+
+        try {
+            mailSender.send(message);
+        } catch (Exception e) {
+            System.err.println("Failed to send bill email to " + bill.getTenant().getEmail());
+        }
     }
 
     /**
@@ -167,5 +218,42 @@ public class BillService {
      */
     public List<Bill> getUnpaidBills() {
         return billRepo.findByPaymentStatus(PaymentStatus.UNPAID);
+    }
+
+    /**
+     * Update the unit rate for an existing UNPAID bill.
+     * Recalculates the total amount and generates a new Cashfree payment link.
+     */
+    @Transactional
+    public Bill updateUnitRate(Long billId, BigDecimal newUnitRate) {
+        Bill bill = getBillById(billId);
+
+        if (bill.getPaymentStatus() == PaymentStatus.PAID) {
+            throw new RuntimeException("Cannot update unit rate for a bill that is already PAID");
+        }
+
+        bill.setUnitRate(newUnitRate);
+        BigDecimal newTotal = bill.getUnitsConsumed().multiply(newUnitRate).setScale(2, RoundingMode.HALF_UP);
+        bill.setTotalAmount(newTotal);
+
+        // Regenerate Cashfree link since the amount changed
+        if (newTotal.compareTo(BigDecimal.ZERO) > 0) {
+            String billDesc = "Updated Electricity Bill: Room " + bill.getRoom().getRoomNumber() + 
+                              " for " + bill.getBillingPeriodStart().getMonth();
+                              
+            CashfreeOrderResponse cfResp = cashfreeService.createOrder(
+                    bill.getTenant().getFullname(), 
+                    bill.getTenant().getEmail(), 
+                    bill.getTenant().getContactNo(), 
+                    newTotal, 
+                    billDesc);
+
+            if (cfResp != null) {
+                bill.setPaymentOrderId(cfResp.getOrderId());
+                bill.setPaymentLink("https://checkout-sandbox.cashfree.com/pay/" + cfResp.getPaymentSessionId());
+            }
+        }
+
+        return billRepo.save(bill);
     }
 }

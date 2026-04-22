@@ -66,11 +66,13 @@ public class SecurityConfig {
                                 "/oauth2/**",
                                 "/login/oauth2/**",
                                 "/esp",
-                                "/ws/telemetry"
+                                "/ws/telemetry",
+                                "/api/v1/payment/webhook"
                         ).permitAll()
                         .requestMatchers(
                                 "/api/v1/power/**",
-                                "/api/v1/bills/**"
+                                "/api/v1/bills/**",
+                                "/api/v1/device/**"
                         ).authenticated()
                         // 3. SECURE EVERYTHING ELSE
                         .anyRequest().permitAll()

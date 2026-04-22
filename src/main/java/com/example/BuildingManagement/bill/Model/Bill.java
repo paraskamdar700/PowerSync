@@ -45,6 +45,15 @@ public class Bill {
     @Column(columnDefinition = "ENUM('UNPAID','PAID','OVERDUE') DEFAULT 'UNPAID'")
     private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
 
+    @Column(name = "payment_order_id")
+    private String paymentOrderId;
+
+    @Column(name = "payment_link", length = 1000)
+    private String paymentLink;
+
+    @Column(name = "due_date")
+    private LocalDateTime dueDate;
+
     @CreationTimestamp
     private LocalDateTime createdAt;
 }

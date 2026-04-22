@@ -210,17 +210,31 @@ Some APIs additionally require specific roles (e.g., `LANDLORD`).
 ## 4. User API (`/api/v1/user`)
 
 ### `GET /api/v1/user/profile`
-- **Description:** Fetch the currently authenticated user's profile.
+- **Description:** Fetch the currently authenticated user's profile details.
+- **Request Headers:** `Cookie: jwt=YOUR_JWT_TOKEN`
 - **Response:** `200 OK`
-  ```text
-  This is protected profile data
+  ```json
+  {
+    "id": 1,
+    "fullname": "Paras Kamdar",
+    "email": "user@example.com",
+    "contactNo": "7000164915",
+    "role": "LANDLORD",
+    "isActive": true
+  }
   ```
 
 ### `GET /api/v1/user/dashboard`
-- **Description:** Fetch the user's dashboard data.
+- **Description:** Fetch the user's dashboard entry point (dynamically returns role-specific strings).
+- **Request Headers:** `Cookie: jwt=YOUR_JWT_TOKEN`
 - **Response:** `200 OK`
-  ```text
-  Protected dashboard
+  ```json
+  {
+    "role": "LANDLORD",
+    "message": "Welcome to the LANDLORD dashboard, Paras Kamdar!",
+    "userId": 1,
+    "email": "user@example.com"
+  }
   ```
 
 ---
@@ -372,29 +386,10 @@ Some APIs additionally require specific roles (e.g., `LANDLORD`).
       "unitRate": 8.00,
       "totalAmount": 0.56,
       "paymentStatus": "UNPAID",
-      "createdAt": "2026-04-22T08:59:06.133554",
-      "room": {
-        "id": 1,
-        "roomNumber": "101",
-        "floorNo": 1,
-        "createdAt": "2026-04-21T22:39:09",
-        "currentTenant": {
-          "id": 1,
-          "fullname": "paras90",
-          "email": "thisthis2@gmail.com",
-          "contactNo": "7000164915",
-          "role": "LANDLORD",
-          "isActive": true
-        }
-      },
-      "tenant": {
-        "id": 1,
-        "fullname": "paras90",
-        "email": "thisthis2@gmail.com",
-        "contactNo": "7000164915",
-        "role": "LANDLORD",
-        "isActive": true
-      }
+      "paymentOrderId": "order_a1b2c3d4",
+      "paymentLink": "https://checkout-sandbox.cashfree.com/pay/session_id_here",
+      "dueDate": "2026-04-25T08:59:06",
+      "createdAt": "2026-04-22T08:59:06"
     }
   ]
   ```
@@ -403,57 +398,34 @@ Some APIs additionally require specific roles (e.g., `LANDLORD`).
 - **Description:** Landlord fetches all bills for a specific room.
 - **Required Role:** `LANDLORD`
 - **Path Variable:** `roomId` (Long)
-- **Response:** `200 OK`
-  ```json
-  [
-    {
-      "id": 4,
-      "billingPeriodStart": "2026-04-21",
-      "billingPeriodEnd": "2026-04-30",
-      "unitsConsumed": 0.07,
-      "unitRate": 8.00,
-      "totalAmount": 0.56,
-      "paymentStatus": "UNPAID",
-      "createdAt": "2026-04-22T08:59:06.133554",
-      "room": {
-        "id": 1,
-        "roomNumber": "101"
-        // ... (Nested room & current tenant omitted for brevity)
-      },
-      "tenant": {
-        "id": 1,
-        "fullname": "paras90",
-        "email": "thisthis2@gmail.com"
-        // ... (Nested tenant properties omitted for brevity)
-      }
-    }
-  ]
-  ```
+- **Response:** `200 OK` (Returns list of `Bill` objects)
 
 ### `GET /api/v1/bills/{billId}`
 - **Description:** Get a single bill detail by ID.
 - **Path Variable:** `billId` (Long)
+- **Response:** `200 OK` (Returns `Bill` object)
+
+### `PUT /api/v1/bills/{billId}/unit-rate`
+- **Description:** Update the unit rate for an existing UNPAID bill. The backend will automatically recalculate the `totalAmount` and explicitly call Cashfree to generate a NEW `paymentLink` reflecting the new total.
+- **Required Role:** `LANDLORD`
+- **Path Variable:** `billId` (Long)
+- **Request Body:**
+  ```json
+  {
+    "unitRate": 10.50
+  }
+  ```
 - **Response:** `200 OK`
   ```json
   {
-    "id": 4,
-    "billingPeriodStart": "2026-04-21",
-    "billingPeriodEnd": "2026-04-30",
-    "unitsConsumed": 0.07,
-    "unitRate": 8.00,
-    "totalAmount": 0.56,
-    "paymentStatus": "UNPAID",
-    "createdAt": "2026-04-22T08:59:06.133554",
-    "room": {
-      "id": 1,
-      "roomNumber": "101"
-      // ... (Nested room & current tenant omitted for brevity)
-    },
-    "tenant": {
-      "id": 1,
-      "fullname": "paras90",
-      "email": "thisthis2@gmail.com"
-      // ... (Nested tenant properties omitted for brevity)
+    "status": "success",
+    "message": "Unit rate updated successfully",
+    "bill": {
+      "id": 4,
+      "totalAmount": 0.74, 
+      "paymentOrderId": "order_new_id",
+      "paymentLink": "https://checkout-sandbox.cashfree.com/pay/new_session"
+      // ... (other bill fields)
     }
   }
   ```
@@ -461,35 +433,10 @@ Some APIs additionally require specific roles (e.g., `LANDLORD`).
 ### `GET /api/v1/bills/unpaid`
 - **Description:** Get all unpaid bills across all tenants.
 - **Required Role:** `LANDLORD`
-- **Response:** `200 OK`
-  ```json
-  [
-    {
-      "id": 4,
-      "billingPeriodStart": "2026-04-21",
-      "billingPeriodEnd": "2026-04-30",
-      "unitsConsumed": 0.07,
-      "unitRate": 8.00,
-      "totalAmount": 0.56,
-      "paymentStatus": "UNPAID",
-      "createdAt": "2026-04-22T08:59:06.133554",
-      "room": {
-        "id": 1,
-        "roomNumber": "101"
-        // ... (Nested room & current tenant omitted for brevity)
-      },
-      "tenant": {
-        "id": 1,
-        "fullname": "paras90",
-        "email": "thisthis2@gmail.com"
-        // ... (Nested tenant properties omitted for brevity)
-      }
-    }
-  ]
-  ```
+- **Response:** `200 OK` (Returns list of `Bill` objects with `paymentStatus = UNPAID`)
 
 ### `POST /api/v1/bills/generate`
-- **Description:** Manually trigger bill generation for a specific month. Useful for testing or if the scheduler missed a run. Bills are auto-generated on the 1st of each month via a scheduler.
+- **Description:** Manually trigger bill generation for a specific month. Useful for testing or if the scheduler missed a run. Bills are auto-generated on the 1st of each month via a scheduler. **NOTE:** The Cashfree URL and Email are generated at this step automatically.
 - **Required Role:** `LANDLORD`
 - **Query Parameters:**
   - `month` (optional, `yyyy-MM-dd`, day is ignored) — defaults to previous month
@@ -503,23 +450,9 @@ Some APIs additionally require specific roles (e.g., `LANDLORD`).
     "bills": [
       {
         "id": 4,
-        "billingPeriodStart": "2026-04-21",
-        "billingPeriodEnd": "2026-04-30",
-        "unitsConsumed": 0.07,
-        "unitRate": 8.00,
         "totalAmount": 0.56,
         "paymentStatus": "UNPAID",
-        "createdAt": "2026-04-22T08:59:06.133554",
-        "room": {
-          "id": 1,
-          "roomNumber": "101"
-          // omitting nested data for brevity
-        },
-        "tenant": {
-          "id": 1,
-          "fullname": "paras90"
-          // omitting nested data for brevity
-        }
+        "createdAt": "2026-04-22T08:59:06"
       }
     ]
   }
@@ -531,4 +464,70 @@ Some APIs additionally require specific roles (e.g., `LANDLORD`).
 - **Partial months:** If a tenant moved in mid-month, billing starts from their actual occupancy date
 - **Auto-generation:** Scheduler runs at `00:00 on the 1st` of every month for the previous month
 - **Duplicate prevention:** If a bill already exists for a tenant + period, it is skipped
+- **Cutoffs:** A secondary scheduler runs at `10:00 AM` every day. If a bill is `UNPAID` and `now > dueDate`, it sends an HTTP command to the ESP32 to cut power.
 
+---
+
+## 9. Device Control API (`/api/v1/device`)
+*These endpoints require authentication (JWT) and landlord privileges.*
+
+### `POST /api/v1/device/{id}/on`
+- **Description:** Manually overrides the power switch to turn the electricity **ON**. The backend sends an HTTP request to `http://<device-ip>:8081/on`.
+- **Required Role:** `LANDLORD`
+- **Path Variable:** `id` (Long - IotDevice ID)
+- **Response:** `200 OK`
+  ```json
+  {
+    "status": "success",
+    "message": "Device turned ON"
+  }
+  ```
+
+### `POST /api/v1/device/{id}/off`
+- **Description:** Manually overrides the power switch to turn the electricity **OFF**. The backend sends an HTTP request to `http://<device-ip>:8081/off`.
+- **Required Role:** `LANDLORD`
+- **Path Variable:** `id` (Long - IotDevice ID)
+- **Response:** `200 OK`
+  ```json
+  {
+    "status": "success",
+    "message": "Device turned OFF"
+  }
+  ```
+
+### `PUT /api/v1/device/universal-unit-rate`
+- **Description:** Globally updates the `unitRatePerKwh` for all registered IoT devices. This essentially sets a universal cost rate for electricity across all managed rooms going forward.
+- **Required Role:** `LANDLORD`
+- **Request Body:**
+  ```json
+  {
+    "unitRate": 12.50
+  }
+  ```
+- **Response:** `200 OK`
+  ```json
+  {
+    "status": "success",
+    "message": "Universal unit rate updated to 12.50"
+  }
+  ```
+
+---
+
+## 10. Webhooks (`/api/v1/payment`)
+
+### `POST /api/v1/payment/webhook`
+- **Description:** Public webhook endpoint hit by the Cashfree Payment Gateway upon successful payment. The backend validates the payment, marks the Bill as `PAID`, and automatically turns the device electricity back to `ON` by calling the ESP32 server.
+- **Authentication:** None (publicly accessible by Cashfree)
+- **Request Body (Simplified for testing):**
+  ```json
+  {
+    "order_id": "order_a1b2c3d4",
+    "payment_status": "SUCCESS"
+  }
+  ```
+- **Response:** `200 OK`
+
+
+run this query when ip is changed or setup: 
+`UPDATE iot_devices SET ip_address = '192.168.x.x' WHERE device_serial = 'Room_101';`

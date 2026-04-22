@@ -76,10 +76,12 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 }
             }
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType("application/json");
-            response.getWriter().write("{\"error\": \"Token Expired\"}");
-            return;
+            // Ignore the expired token. 
+            // If the user is trying to access a protected endpoint, Spring Security will return 401 because the context is null.
+            // If the user is hitting /login, We MUST let the request through so they can get a new token.
+            System.out.println("Warning: Token expired for request to " + request.getRequestURI());
+        } catch (Exception e) {
+            System.out.println("Warning: Invalid token for request to " + request.getRequestURI() + " - " + e.getMessage());
         }
 
         filterChain.doFilter(request, response);

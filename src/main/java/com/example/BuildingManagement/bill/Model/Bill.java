@@ -6,9 +6,11 @@ import com.example.BuildingManagement.user.Model.User;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "bills")
@@ -30,11 +32,19 @@ public class Bill {
     private LocalDate billingPeriodStart;
     private LocalDate billingPeriodEnd;
 
+    @Column(name = "units_consumed")
+    private BigDecimal unitsConsumed;
+
+    @Column(name = "unit_rate")
+    private BigDecimal unitRate;
+
     @Column(name = "total_amount")
     private BigDecimal totalAmount;
 
     @Enumerated(EnumType.STRING)
-    private PaymentStatus paymentStatus; // UNPAID, PAID, OVERDUE
+    @Column(columnDefinition = "ENUM('UNPAID','PAID','OVERDUE') DEFAULT 'UNPAID'")
+    private PaymentStatus paymentStatus = PaymentStatus.UNPAID;
+
+    @CreationTimestamp
+    private LocalDateTime createdAt;
 }
-
-

@@ -64,10 +64,14 @@ public class SecurityConfig {
                                 "/",
                                 "/api/v1/auth/**",
                                 "/oauth2/**",
-                                "/login/oauth2/**"
+                                "/login/oauth2/**",
+                                "/esp",
+                                "/ws/telemetry"
                         ).permitAll()
-                        // 2. PROTECTED ENDPOINTS (Your IoT/Billing logic)
-//                        .requestMatchers("/api/v1/auth/**").authenticated()
+                        .requestMatchers(
+                                "/api/v1/power/**",
+                                "/api/v1/bills/**"
+                        ).authenticated()
                         // 3. SECURE EVERYTHING ELSE
                         .anyRequest().permitAll()
                 )
